@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THEIA Job Portal</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px;
+      background-color: #fff;
+      border-bottom: 1px solid #ddd;
+    }
+    .header .logo {
+      font-size: 24px;
+      font-weight: bold;
+    }
+    .nav {
+      display: flex;
+      gap: 20px;
+    }
+    .nav a {
+      text-decoration: none;
+      color: #333;
+      font-weight: 500;
+    }
+    .nav a:hover {
+      color: #007bff;
+    }
+    .buttons {
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-orange {
+      background-color: #ff6200;
+      color: white;
+    }
+    .btn-green {
+      background-color: #28a745;
+      color: white;
+    }
+    .content {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .card-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .card {
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+    }
+    .card h3 {
+      margin: 0 0 10px;
+      color: #333;
+    }
+    .card p {
+      margin: 0;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <div class="logo">THEIA</div>
+      <div class="nav">
+        <a href="#">Home</a>
+        <a href="#">Products</a>
+        <a href="#">Pricing</a>
+        <a href="#">About</a>
+        <a href="#">Jobs</a>
+      </div>
+      <div class="buttons">
+        <button class="btn btn-orange">Get Started</button>
+        <button class="btn btn-green">Test Salesforce Connection</button>
+      </div>
+    </div>
+    <div class="content">
+      <div v-if="jobs.length === 0">No jobs available.</div>
+      <div class="card-container" v-else>
+        <div class="card" v-for="job in jobs" :key="job.id">
+          <h3>{{ job.Job_Public_Name__c }}</h3>
+          <p>{{ job.Opportunity_Discussed_Question_1__c }}</p>
+          <div>
+            <input type="text" class="card-input" v-model="job.inputValue" placeholder="Enter notes...">
+            <button class="card-button" @click="handleJobClick(job.Id, job.inputValue)">View Details</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.8.3/axios.min.js" integrity="sha512-GM+dbfuQPeVaDSIsb+vSOSJJoH3/WP3MstSIL6zYmIPCUY3wNdU32LoaGo2YtXpkP0e6Clpb8cHHHdJ1t4nVfA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script type="module">
+    import { createApp, ref } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
+
+    const API_URL = 'http://localhost:5038/';
+
+    createApp({
+      setup() {
+        const jobs = ref([]);
+        return {
+          jobs,
+        };
+      },
+      methods: {
+        async getJobs() {
+          try {
+            const response = await axios.get(API_URL + 'getJobs');
+            this.jobs = response.data.records || [];
+            console.log(response.data.records);
+          } catch (error) {
+            console.error('Error fetching jobs:', error);
+            this.jobs = [];
+          }
+        },
+        async handleJobClick(jobId, inputValue) {
+            try {
+                const response = await axios.post(API_URL + 'updateJob', {
+                    Id: jobId,
+                    answer: inputValue
+                },{
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                console.log('Job notes updated:', response.data);
+                // Optionally, you can update the job's input value or refresh the job list
+            } catch (error) {
+                console.error('Error updating job notes:', error);
+            }
+        },
+      },
+      mounted() {
+        this.getJobs();
+      },
+    }).mount('#app');
+  </script>
+</body>
+</html>
