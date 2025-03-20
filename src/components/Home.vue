@@ -41,12 +41,74 @@
             >
             <button 
               class="btn btn-green" 
-              @click="updateInternalAnswer"
+              @click="analyzeAnswerWithGemini('Internal_Q_1__c',opportunityDiscussed.Internal_Q_1__c,internalAnswer)"
               :disabled="!opportunityDiscussed"
             >
               Save Answer
             </button>
           </div>
+        </div>
+
+        <!-- Internal Question 2 Section -->
+        <div class="question-section">
+          <h4>Internal Question 2:</h4>
+          <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_2__c }}</p>
+          <p v-else>Loading internal question...</p>
+          <div class="input-group">
+            <input 
+              type="text" 
+              v-model="internalAnswer2" 
+              :placeholder="opportunityDiscussed ? (opportunityDiscussed.Internal_Answer_1__c || 'Enter your answer...') : 'Loading...'"
+              :disabled="!opportunityDiscussed"
+            >
+            <button 
+              class="btn btn-green" 
+              @click="analyzeAnswerWithGemini('Internal_Q_2__c',opportunityDiscussed.Internal_Q_2__c,internalAnswer2)"
+              :disabled="!opportunityDiscussed"
+            >
+              Save Answer
+            </button>
+          </div>
+        </div>
+
+        <!-- Internal Question 2 Section -->
+        <div class="question-section">
+          <h4>Internal Question 3:</h4>
+          <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_3__c }}</p>
+          <p v-else>Loading internal question...</p>
+          <div class="input-group">
+            <input 
+              type="text" 
+              v-model="internalAnswer3" 
+              :placeholder="opportunityDiscussed ? (opportunityDiscussed.Internal_Answer_1__c || 'Enter your answer...') : 'Loading...'"
+              :disabled="!opportunityDiscussed"
+            >
+            <button 
+              class="btn btn-green" 
+              @click="analyzeAnswerWithGemini('Internal_Q_3__c',opportunityDiscussed.Internal_Q_3__c,internalAnswer3)"
+              :disabled="!opportunityDiscussed"
+            >
+              Save Answer
+            </button>
+          </div>
+        </div>
+
+        <div class="question-section">
+          <h4>Analysis 1:</h4>
+          <p>{{ analysisInternal_Q_1__c }}</p>
+          
+        </div>
+
+        <div class="question-section">
+          <h4>Analysis 2:</h4>
+          <p v-if="opportunityDiscussed">{{ analysisInternal_Q_2__c }}</p>
+          
+        </div>
+
+        <div class="question-section">
+          <h4>Analysis 3:</h4>
+          <p v-if="opportunityDiscussed">{{ analysisInternal_Q_3__c }}</p>
+          
         </div>
 
         <!-- AI Analysis Section with Tabs -->
@@ -152,6 +214,11 @@ const API_URL = 'http://localhost:5038/';
 const jobs = ref([]);
 const opportunityDiscussed = ref(null);
 const internalAnswer = ref('');
+const internalAnswer2 = ref('');
+const internalAnswer3 = ref('');
+const analysisInternal_Q_1__c = ref('');
+const analysisInternal_Q_2__c = ref('');
+const analysisInternal_Q_3__c = ref('');
 const loading = ref(true);
 const analysis = ref('');
 const activeTab = ref('analysis');
@@ -211,6 +278,38 @@ const getPrompts = async () => {
     prompts.value = [];
   }
 };
+
+const analyzeAnswerWithGemini = async (field,question,answer) => {
+  
+  try {
+    const response = await axios.post(`${API_URL}processInternalAnswerGemini`, {
+      jobData: jobs.value[0],
+      question: question,
+      answer: answer,
+      field:field
+    });
+
+    console.log(response);
+
+    if (field=="Internal_Q_1__c"){
+        analysisInternal_Q_1__c.value = response.data.analysis;
+        this.updateInternalAnswer();
+    }
+
+    if (field=="Internal_Q_2__c"){
+        analysisInternal_Q_2__c.value = response.data.analysis;
+    }
+
+    if (field=="Internal_Q_3__c"){
+        analysisInternal_Q_3__c.value = response.data.analysis;
+    }
+    
+  } catch (error) {
+    console.error('Error analyzing with Gemini:', error);
+    alert('Error analyzing with Gemini. Please try again.');
+  }
+};
+
 
 const analyzeWithGemini = async () => {
   if (!selectedPromptId.value) {
