@@ -25,145 +25,219 @@
           <h3>{{ jobs[0].Job_Public_Name__c }}</h3>
         </div>
         
-        <!-- Internal Question Section -->
-        <div class="question-section">
-          <h4>Internal Question:</h4>
-          <div class="question-with-controls">
-            <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_1__c }}</p>
-            <p v-else>Loading internal question...</p>
-            <button 
-              class="btn btn-audio" 
-              @click="speakText(opportunityDiscussed.Internal_Q_1__c)"
-              :disabled="!opportunityDiscussed || isGeneratingSpeech"
-              title="Read question aloud"
+        <!-- Main content with tabs -->
+        <div class="main-tabs-container">
+          <div class="main-tabs">
+            <div 
+              class="main-tab" 
+              :class="{ active: mainActiveTab === 'questions' }"
+              @click="mainActiveTab = 'questions'"
             >
-              <span v-if="isGeneratingSpeech">🔊 ...</span>
-              <span v-else>🔊</span>
-            </button>
-          </div>
-          <audio ref="audioPlayer" style="display: none;"></audio>
-          <div class="input-group">
-            <input 
-              type="text" 
-              v-model="internalAnswer" 
-              :placeholder="opportunityDiscussed ? (opportunityDiscussed.Internal_Answer_1__c || 'Enter your answer...') : 'Loading...'"
-              :disabled="!opportunityDiscussed"
-            >
-            <div class="input-controls">
-              <button 
-                class="btn btn-recording" 
-                @click="toggleRecording(1)"
-                :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 1)"
-                :class="{ 'recording': isRecording && currentQuestionNumber === 1 }"
-                title="Record your answer"
-              >
-                <span v-if="isRecording && currentQuestionNumber === 1">⏹️</span>
-                <span v-else>🎤</span>
-              </button>
-              <button 
-                class="btn btn-green" 
-                @click="analyzeAnswerWithGemini('Internal_Q_1__c',opportunityDiscussed.Internal_Q_1__c,internalAnswer)"
-                :disabled="!opportunityDiscussed"
-              >
-                Save Answer
-              </button>
+              Interview Questions
             </div>
-            <div v-if="isTranscribing && currentQuestionNumber === 1" class="transcribing-indicator">
-              Converting speech to text...
+            <div 
+              class="main-tab" 
+              :class="{ active: mainActiveTab === 'analysis' }"
+              @click="mainActiveTab = 'analysis'"
+            >
+              Analysis
             </div>
           </div>
-        </div>
-
-        <!-- Internal Question 2 Section -->
-        <div class="question-section">
-          <h4>Internal Question 2:</h4>
-          <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_2__c }}</p>
-          <p v-else>Loading internal question...</p>
-          <div class="input-group">
-            <input 
-              type="text" 
-              v-model="internalAnswer2" 
-              :placeholder="opportunityDiscussed ? (opportunityDiscussed.Internal_Answer_1__c || 'Enter your answer...') : 'Loading...'"
-              :disabled="!opportunityDiscussed"
-            >
-            <div class="input-controls">
-              <button 
-                class="btn btn-recording" 
-                @click="toggleRecording(2)"
-                :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 2)"
-                :class="{ 'recording': isRecording && currentQuestionNumber === 2 }"
-                title="Record your answer"
-              >
-                <span v-if="isRecording && currentQuestionNumber === 2">⏹️</span>
-                <span v-else>🎤</span>
-              </button>
-              <button 
-                class="btn btn-green" 
-                @click="analyzeAnswerWithGemini('Internal_Q_2__c',opportunityDiscussed.Internal_Q_2__c,internalAnswer2)"
-                :disabled="!opportunityDiscussed"
-              >
-                Save Answer
-              </button>
-            </div>
-            <div v-if="isTranscribing && currentQuestionNumber === 2" class="transcribing-indicator">
-              Converting speech to text...
-            </div>
-          </div>
-        </div>
-
-        <!-- Internal Question 3 Section -->
-        <div class="question-section">
-          <h4>Internal Question 3:</h4>
-          <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_3__c }}</p>
-          <p v-else>Loading internal question...</p>
-          <div class="input-group">
-            <input 
-              type="text" 
-              v-model="internalAnswer3" 
-              :placeholder="opportunityDiscussed ? (opportunityDiscussed.Internal_Answer_1__c || 'Enter your answer...') : 'Loading...'"
-              :disabled="!opportunityDiscussed"
-            >
-            <div class="input-controls">
-              <button 
-                class="btn btn-recording" 
-                @click="toggleRecording(3)"
-                :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 3)"
-                :class="{ 'recording': isRecording && currentQuestionNumber === 3 }"
-                title="Record your answer"
-              >
-                <span v-if="isRecording && currentQuestionNumber === 3">⏹️</span>
-                <span v-else>🎤</span>
-              </button>
-              <button 
-                class="btn btn-green" 
-                @click="analyzeAnswerWithGemini('Internal_Q_3__c',opportunityDiscussed.Internal_Q_3__c,internalAnswer3)"
-                :disabled="!opportunityDiscussed"
-              >
-                Save Answer
-              </button>
-            </div>
-            <div v-if="isTranscribing && currentQuestionNumber === 3" class="transcribing-indicator">
-              Converting speech to text...
-            </div>
-          </div>
-        </div>
-
-        <div class="question-section">
-          <h4>Analysis 1:</h4>
-          <p>{{ analysisInternal_Q_1__c }}</p>
           
-        </div>
+          <!-- Interview Questions Tab -->
+          <div class="main-tab-content" :class="{ active: mainActiveTab === 'questions' }">
+            <!-- Internal Question Section -->
+            <div class="question-section">
+              <h4>First Question:</h4>
+              <div class="question-with-controls">
+                <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_1__c }}</p>
+                <p v-else>Loading question...</p>
+                <button 
+                  class="btn btn-audio" 
+                  @click="speakText(opportunityDiscussed.Internal_Q_1__c)"
+                  :disabled="!opportunityDiscussed || isGeneratingSpeech"
+                  title="Read question aloud"
+                >
+                  <span v-if="isGeneratingSpeech">🔊 ...</span>
+                  <span v-else>🔊</span>
+                </button>
+              </div>
+              <audio ref="audioPlayer" style="display: none;"></audio>
+              <div class="input-group">
+                <textarea 
+                  v-model="internalAnswer" 
+                  :placeholder="opportunityDiscussed ? 'Share with us your best answer' : 'Loading...'"
+                  :disabled="!opportunityDiscussed"
+                  class="expandable-textarea"
+                  rows="3"
+                  @input="autoGrow($event.target)"
+                ></textarea>
+                <div class="input-controls">
+                  <button 
+                    class="btn btn-recording" 
+                    @click="toggleRecording(1)"
+                    :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 1)"
+                    :class="{ 'recording': isRecording && currentQuestionNumber === 1 }"
+                    title="Record your answer"
+                  >
+                    <span v-if="isRecording && currentQuestionNumber === 1">⏹️</span>
+                    <span v-else>🎤</span>
+                  </button>
+                  <button 
+                    class="btn btn-green" 
+                    @click="analyzeAnswerWithGemini('Internal_Q_1__c',opportunityDiscussed.Internal_Q_1__c,internalAnswer)"
+                    :disabled="!opportunityDiscussed"
+                  >
+                    Save Answer
+                  </button>
+                </div>
+                <div v-if="isTranscribing && currentQuestionNumber === 1" class="transcribing-indicator">
+                  Converting speech to text...
+                </div>
+              </div>
+            </div>
 
-        <div class="question-section">
-          <h4>Analysis 2:</h4>
-          <p v-if="opportunityDiscussed">{{ analysisInternal_Q_2__c }}</p>
-          
-        </div>
+            <!-- Internal Question 2 Section -->
+            <div class="question-section">
+              <h4>Second Question:</h4>
+              <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_2__c }}</p>
+              <p v-else>Loading question...</p>
+              <div class="input-group">
+                <textarea 
+                  v-model="internalAnswer2" 
+                  :placeholder="opportunityDiscussed ? 'Share with us your best answer' : 'Loading...'"
+                  :disabled="!opportunityDiscussed"
+                  class="expandable-textarea"
+                  rows="3"
+                  @input="autoGrow($event.target)"
+                ></textarea>
+                <div class="input-controls">
+                  <button 
+                    class="btn btn-recording" 
+                    @click="toggleRecording(2)"
+                    :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 2)"
+                    :class="{ 'recording': isRecording && currentQuestionNumber === 2 }"
+                    title="Record your answer"
+                  >
+                    <span v-if="isRecording && currentQuestionNumber === 2">⏹️</span>
+                    <span v-else>🎤</span>
+                  </button>
+                  <button 
+                    class="btn btn-green" 
+                    @click="analyzeAnswerWithGemini('Internal_Q_2__c',opportunityDiscussed.Internal_Q_2__c,internalAnswer2)"
+                    :disabled="!opportunityDiscussed"
+                  >
+                    Save Answer
+                  </button>
+                </div>
+                <div v-if="isTranscribing && currentQuestionNumber === 2" class="transcribing-indicator">
+                  Converting speech to text...
+                </div>
+              </div>
+            </div>
 
-        <div class="question-section">
-          <h4>Analysis 3:</h4>
-          <p v-if="opportunityDiscussed">{{ analysisInternal_Q_3__c }}</p>
+            <!-- Internal Question 3 Section -->
+            <div class="question-section">
+              <h4>Third Question:</h4>
+              <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_3__c }}</p>
+              <p v-else>Loading question...</p>
+              <div class="input-group">
+                <textarea 
+                  v-model="internalAnswer3" 
+                  :placeholder="opportunityDiscussed ? 'Share with us your best answer' : 'Loading...'"
+                  :disabled="!opportunityDiscussed"
+                  class="expandable-textarea"
+                  rows="3"
+                  @input="autoGrow($event.target)"
+                ></textarea>
+                <div class="input-controls">
+                  <button 
+                    class="btn btn-recording" 
+                    @click="toggleRecording(3)"
+                    :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 3)"
+                    :class="{ 'recording': isRecording && currentQuestionNumber === 3 }"
+                    title="Record your answer"
+                  >
+                    <span v-if="isRecording && currentQuestionNumber === 3">⏹️</span>
+                    <span v-else>🎤</span>
+                  </button>
+                  <button 
+                    class="btn btn-green" 
+                    @click="saveThirdAnswerAndGenerateNext"
+                    :disabled="!opportunityDiscussed"
+                  >
+                    Save Answer
+                  </button>
+                </div>
+                <div v-if="isTranscribing && currentQuestionNumber === 3" class="transcribing-indicator">
+                  Converting speech to text...
+                </div>
+              </div>
+            </div>
+
+            <!-- Fourth Question Section (Generated) -->
+            <div class="question-section" v-if="fourthQuestion || isGeneratingQuestion">
+              <h4>Fourth Question:</h4>
+              <div v-if="isGeneratingQuestion" class="generating-indicator">
+                <div class="spinner"></div>
+                <p>Generating follow-up question based on your answers...</p>
+              </div>
+              <p v-else>{{ fourthQuestion }}</p>
+              <div class="input-group" v-if="!isGeneratingQuestion">
+                <textarea 
+                  v-model="internalAnswer4" 
+                  placeholder="Share with us your best answer"
+                  class="expandable-textarea"
+                  rows="3"
+                  @input="autoGrow($event.target)"
+                ></textarea>
+                <div class="input-controls">
+                  <button 
+                    class="btn btn-recording" 
+                    @click="toggleRecording(4)"
+                    :disabled="isTranscribing || (isRecording && currentQuestionNumber !== 4)"
+                    :class="{ 'recording': isRecording && currentQuestionNumber === 4 }"
+                    title="Record your answer"
+                  >
+                    <span v-if="isRecording && currentQuestionNumber === 4">⏹️</span>
+                    <span v-else>🎤</span>
+                  </button>
+                  <button 
+                    class="btn btn-green" 
+                    @click="saveFourthAnswer"
+                  >
+                    Save Answer
+                  </button>
+                </div>
+                <div v-if="isTranscribing && currentQuestionNumber === 4" class="transcribing-indicator">
+                  Converting speech to text...
+                </div>
+              </div>
+            </div>
+          </div>
           
+          <!-- Analysis Tab -->
+          <div class="main-tab-content" :class="{ active: mainActiveTab === 'analysis' }">
+            <div class="question-section">
+              <h4>First Question Analysis:</h4>
+              <p>{{ analysisInternal_Q_1__c }}</p>
+            </div>
+
+            <div class="question-section">
+              <h4>Second Question Analysis:</h4>
+              <p v-if="opportunityDiscussed">{{ analysisInternal_Q_2__c }}</p>
+            </div>
+
+            <div class="question-section">
+              <h4>Third Question Analysis:</h4>
+              <p v-if="opportunityDiscussed">{{ analysisInternal_Q_3__c }}</p>
+            </div>
+            
+            <div class="question-section" v-if="fourthQuestionAnalysis">
+              <h4>Fourth Question Analysis:</h4>
+              <p>{{ fourthQuestionAnalysis }}</p>
+            </div>
+          </div>
         </div>
 
         <!-- AI Analysis Section with Tabs -->
@@ -302,6 +376,11 @@ const mediaRecorder = ref(null);
 const audioChunks = ref([]);
 const currentQuestionNumber = ref(null);
 const audioStream = ref(null);
+const mainActiveTab = ref('questions');
+const internalAnswer4 = ref('');
+const fourthQuestion = ref('');
+const fourthQuestionAnalysis = ref('');
+const isGeneratingQuestion = ref(false);
 
 // Computed property to extract the question from analysis
 const extractedQuestion = () => {
@@ -646,6 +725,9 @@ const transcribeAudio = async () => {
       } else if (currentQuestionNumber.value === 3) {
         internalAnswer3.value = response.data.text;
         console.log('Updated question 3 answer:', internalAnswer3.value);
+      } else if (currentQuestionNumber.value === 4) {
+        internalAnswer4.value = response.data.text;
+        console.log('Updated question 4 answer:', internalAnswer4.value);
       }
     } else {
       console.error('Failed to transcribe speech:', response.data);
@@ -667,6 +749,79 @@ const toggleRecording = (questionNumber) => {
   } else {
     currentQuestionNumber.value = questionNumber;
     startRecording();
+  }
+};
+
+// Add the autoGrow function for dynamically expanding textareas
+const autoGrow = (element) => {
+  element.style.height = "auto";
+  element.style.height = (element.scrollHeight) + "px";
+};
+
+// New function to save third answer and generate fourth question
+const saveThirdAnswerAndGenerateNext = async () => {
+  // First save the third answer
+  await analyzeAnswerWithGemini('Internal_Q_3__c', opportunityDiscussed.value.Internal_Q_3__c, internalAnswer3.value);
+  
+  // Then generate the next question
+  await generateNextQuestion();
+};
+
+// Function to generate the next question
+const generateNextQuestion = async () => {
+  try {
+    isGeneratingQuestion.value = true;
+    
+    // Auto-select the "Generate Next Interview Question" prompt
+    const nextQuestionPrompt = prompts.value.find(p => p.id === 'generate_next_question');
+    if (!nextQuestionPrompt) {
+      console.error('Next question prompt not found');
+      alert('Unable to generate next question. Prompt template not found.');
+      return;
+    }
+    
+    selectedPromptId.value = 'generate_next_question';
+    selectedPrompt.value = nextQuestionPrompt;
+    
+    // Call the existing analyzeWithGemini function
+    await analyzeWithGemini();
+    
+    // Extract the question from the analysis and set it as the fourth question
+    fourthQuestion.value = extractedQuestion();
+    
+    // If successful, scroll to the new question
+    if (fourthQuestion.value) {
+      setTimeout(() => {
+        const fourthQuestionElement = document.querySelector('.question-section:nth-child(4)');
+        if (fourthQuestionElement) {
+          fourthQuestionElement.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 300);
+    }
+  } catch (error) {
+    console.error('Error generating next question:', error);
+    alert('Error generating next question. Please try again.');
+  } finally {
+    isGeneratingQuestion.value = false;
+  }
+};
+
+// Function to save the fourth answer
+const saveFourthAnswer = async () => {
+  try {
+    // Process the fourth answer
+    const response = await axios.post(`${API_URL}processInternalAnswerGemini`, {
+      jobData: jobs.value[0],
+      question: fourthQuestion.value,
+      answer: internalAnswer4.value,
+      field: 'Fourth_Question'
+    });
+    
+    fourthQuestionAnalysis.value = response.data.analysis;
+    alert('Fourth answer saved and analyzed successfully!');
+  } catch (error) {
+    console.error('Error analyzing fourth answer:', error);
+    alert('Error analyzing fourth answer. Please try again.');
   }
 };
 
@@ -1024,4 +1179,115 @@ onMounted(async () => {
         transform: scale(1);
       }
     }
-  </style>
+    
+    /* Add styles for the expandable textarea */
+    .expandable-textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      resize: none;
+      overflow: hidden;
+      transition: height 0.2s;
+      font-family: inherit;
+      font-size: 14px;
+      line-height: 1.5;
+      max-height: 300px;
+    }
+    
+    .expandable-textarea:focus {
+      outline: none;
+      border-color: #4a90e2;
+      box-shadow: 0 0 3px rgba(74, 144, 226, 0.3);
+    }
+
+    /* Main tab styles */
+    .main-tabs-container {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: #fff;
+      overflow: hidden;
+    }
+    
+    .main-tabs {
+      display: flex;
+      background-color: #f9f9f9;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    .main-tab {
+      padding: 12px 20px;
+      cursor: pointer;
+      font-weight: 500;
+      text-align: center;
+      flex: 1;
+      transition: background-color 0.2s;
+    }
+    
+    .main-tab:first-child {
+      border-right: 1px solid #ddd;
+    }
+    
+    .main-tab.active {
+      background-color: #fff;
+      color: #ff6200;
+      border-bottom: 2px solid #ff6200;
+      margin-bottom: -1px;
+    }
+    
+    .main-tab:hover:not(.active) {
+      background-color: #f0f0f0;
+    }
+    
+    .main-tab-content {
+      display: none;
+      padding: 20px;
+    }
+    
+    .main-tab-content.active {
+      display: block;
+    }
+    
+    /* Question section styling inside tabs */
+    .main-tab-content .question-section {
+      margin-top: 0;
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .main-tab-content .question-section:last-child {
+      margin-bottom: 0;
+    }
+    
+    /* Styles for the question generation spinner */
+    .generating-indicator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 15px;
+      margin: 10px 0;
+    }
+    
+    .generating-indicator p {
+      margin-top: 10px;
+      color: #666;
+      font-style: italic;
+    }
+    
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top-color: #ff6200;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+</style>
