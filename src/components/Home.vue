@@ -20,11 +20,9 @@
       <!-- Job Section -->
       <div v-if="loading" class="loading">Loading data...</div>
       <div v-else>
-        <div class="card-container" v-if="jobs.length > 0">
-          <div class="card" v-for="job in jobs" :key="job.Id">
-            <h3>{{ job.Job_Public_Name__c }}</h3>
-            <p>{{ job.Opportunity_Discussed_Question_1__c }}</p>
-          </div>
+        <!-- Main Job Card - This displays the job name from Salesforce -->
+        <div class="job-card" v-if="jobs.length > 0">
+          <h3>{{ jobs[0].Job_Public_Name__c }}</h3>
         </div>
         
         <!-- Internal Question Section -->
@@ -71,7 +69,7 @@
           </div>
         </div>
 
-        <!-- Internal Question 2 Section -->
+        <!-- Internal Question 3 Section -->
         <div class="question-section">
           <h4>Internal Question 3:</h4>
           <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_3__c }}</p>
@@ -155,6 +153,14 @@
             <div v-if="analysis" class="analysis-result">
               {{ analysis }}
             </div>
+            
+            <!-- Next Interview Question Display Section -->
+            <div v-if="selectedPromptId === 'generate_next_question' && analysis" class="next-question-section">
+              <h4>Next Interview Question:</h4>
+              <div class="next-question-display">
+                {{ extractedQuestion() }}
+              </div>
+            </div>
           </div>
 
           <!-- Prompts Management Tab -->
@@ -232,11 +238,32 @@ const promptForm = ref({
   template: ''
 });
 
+// Computed property to extract the question from analysis
+const extractedQuestion = () => {
+  if (!analysis.value || selectedPromptId.value !== 'generate_next_question') {
+    return '';
+  }
+  
+  // Try to extract just the question part, assuming it might be prefixed with explanatory text
+  const text = analysis.value;
+  
+  // Look for question patterns
+  const questionMatches = text.match(/(?:Question:|Next Question:|Interview Question:)?\s*(.+\?)/i);
+  if (questionMatches && questionMatches[1]) {
+    return questionMatches[1].trim();
+  }
+  
+  // If no question mark is found, return the whole text as the question
+  return text;
+};
+
 // Methods
 const getJobs = async () => {
   try {
     const response = await axios.get(`${API_URL}getJobs`);
+    console.log('Jobs API response:', response.data);
     jobs.value = response.data.records || [];
+    console.log('Job Public Name:', jobs.value.length > 0 ? jobs.value[0].Job_Public_Name__c : 'No jobs');
   } catch (error) {
     console.error('Error fetching jobs:', error);
     jobs.value = [];
@@ -293,7 +320,7 @@ const analyzeAnswerWithGemini = async (field,question,answer) => {
 
     if (field=="Internal_Q_1__c"){
         analysisInternal_Q_1__c.value = response.data.analysis;
-        this.updateInternalAnswer();
+        updateInternalAnswer();
     }
 
     if (field=="Internal_Q_2__c"){
@@ -317,11 +344,21 @@ const analyzeWithGemini = async () => {
     return;
   }
   try {
-    const response = await axios.post(`${API_URL}processWithGemini`, {
+    // Include analysis values if using the generate_next_question prompt
+    const requestData = {
       jobData: jobs.value[0],
       opportunityData: opportunityDiscussed.value,
       promptId: selectedPromptId.value
-    });
+    };
+    
+    // Add analysis data if using the generate_next_question prompt
+    if (selectedPromptId.value === 'generate_next_question') {
+      requestData.analysis1 = analysisInternal_Q_1__c.value;
+      requestData.analysis2 = analysisInternal_Q_2__c.value;
+      requestData.analysis3 = analysisInternal_Q_3__c.value;
+    }
+    
+    const response = await axios.post(`${API_URL}processWithGemini`, requestData);
     analysis.value = response.data.analysis;
   } catch (error) {
     console.error('Error analyzing with Gemini:', error);
@@ -495,6 +532,20 @@ onMounted(async () => {
       margin: 0;
       color: #666;
     }
+    .job-card {
+      margin: 15px 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: #fff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .job-card h3 {
+      margin: 0 0 10px;
+      color: #333;
+      text-align: center;
+      font-size: 20px;
+    }
     .question-section {
       margin-top: 20px;
       padding: 15px;
@@ -542,6 +593,31 @@ onMounted(async () => {
       background-color: #fff;
       border: 1px solid #ddd;
       border-radius: 4px;
+      white-space: pre-wrap;
+    }
+    .next-question-section {
+      margin-top: 25px;
+      padding: 20px;
+      background-color: #f0f8ff;
+      border: 1px solid #4682b4;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    .next-question-section h4 {
+      margin: 0 0 15px;
+      color: #4682b4;
+      font-weight: bold;
+      text-align: center;
+      font-size: 18px;
+    }
+    .next-question-display {
+      padding: 15px;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 16px;
+      font-weight: 500;
+      color: #333;
       white-space: pre-wrap;
     }
     select {
