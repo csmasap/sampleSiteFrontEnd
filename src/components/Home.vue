@@ -28,8 +28,20 @@
         <!-- Internal Question Section -->
         <div class="question-section">
           <h4>Internal Question:</h4>
-          <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_1__c }}</p>
-          <p v-else>Loading internal question...</p>
+          <div class="question-with-controls">
+            <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_1__c }}</p>
+            <p v-else>Loading internal question...</p>
+            <button 
+              class="btn btn-audio" 
+              @click="speakText(opportunityDiscussed.Internal_Q_1__c)"
+              :disabled="!opportunityDiscussed || isGeneratingSpeech"
+              title="Read question aloud"
+            >
+              <span v-if="isGeneratingSpeech">🔊 ...</span>
+              <span v-else>🔊</span>
+            </button>
+          </div>
+          <audio ref="audioPlayer" style="display: none;"></audio>
           <div class="input-group">
             <input 
               type="text" 
@@ -37,13 +49,28 @@
               :placeholder="opportunityDiscussed ? (opportunityDiscussed.Internal_Answer_1__c || 'Enter your answer...') : 'Loading...'"
               :disabled="!opportunityDiscussed"
             >
-            <button 
-              class="btn btn-green" 
-              @click="analyzeAnswerWithGemini('Internal_Q_1__c',opportunityDiscussed.Internal_Q_1__c,internalAnswer)"
-              :disabled="!opportunityDiscussed"
-            >
-              Save Answer
-            </button>
+            <div class="input-controls">
+              <button 
+                class="btn btn-recording" 
+                @click="toggleRecording(1)"
+                :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 1)"
+                :class="{ 'recording': isRecording && currentQuestionNumber === 1 }"
+                title="Record your answer"
+              >
+                <span v-if="isRecording && currentQuestionNumber === 1">⏹️</span>
+                <span v-else>🎤</span>
+              </button>
+              <button 
+                class="btn btn-green" 
+                @click="analyzeAnswerWithGemini('Internal_Q_1__c',opportunityDiscussed.Internal_Q_1__c,internalAnswer)"
+                :disabled="!opportunityDiscussed"
+              >
+                Save Answer
+              </button>
+            </div>
+            <div v-if="isTranscribing && currentQuestionNumber === 1" class="transcribing-indicator">
+              Converting speech to text...
+            </div>
           </div>
         </div>
 
@@ -59,13 +86,28 @@
               :placeholder="opportunityDiscussed ? (opportunityDiscussed.Internal_Answer_1__c || 'Enter your answer...') : 'Loading...'"
               :disabled="!opportunityDiscussed"
             >
-            <button 
-              class="btn btn-green" 
-              @click="analyzeAnswerWithGemini('Internal_Q_2__c',opportunityDiscussed.Internal_Q_2__c,internalAnswer2)"
-              :disabled="!opportunityDiscussed"
-            >
-              Save Answer
-            </button>
+            <div class="input-controls">
+              <button 
+                class="btn btn-recording" 
+                @click="toggleRecording(2)"
+                :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 2)"
+                :class="{ 'recording': isRecording && currentQuestionNumber === 2 }"
+                title="Record your answer"
+              >
+                <span v-if="isRecording && currentQuestionNumber === 2">⏹️</span>
+                <span v-else>🎤</span>
+              </button>
+              <button 
+                class="btn btn-green" 
+                @click="analyzeAnswerWithGemini('Internal_Q_2__c',opportunityDiscussed.Internal_Q_2__c,internalAnswer2)"
+                :disabled="!opportunityDiscussed"
+              >
+                Save Answer
+              </button>
+            </div>
+            <div v-if="isTranscribing && currentQuestionNumber === 2" class="transcribing-indicator">
+              Converting speech to text...
+            </div>
           </div>
         </div>
 
@@ -81,13 +123,28 @@
               :placeholder="opportunityDiscussed ? (opportunityDiscussed.Internal_Answer_1__c || 'Enter your answer...') : 'Loading...'"
               :disabled="!opportunityDiscussed"
             >
-            <button 
-              class="btn btn-green" 
-              @click="analyzeAnswerWithGemini('Internal_Q_3__c',opportunityDiscussed.Internal_Q_3__c,internalAnswer3)"
-              :disabled="!opportunityDiscussed"
-            >
-              Save Answer
-            </button>
+            <div class="input-controls">
+              <button 
+                class="btn btn-recording" 
+                @click="toggleRecording(3)"
+                :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 3)"
+                :class="{ 'recording': isRecording && currentQuestionNumber === 3 }"
+                title="Record your answer"
+              >
+                <span v-if="isRecording && currentQuestionNumber === 3">⏹️</span>
+                <span v-else>🎤</span>
+              </button>
+              <button 
+                class="btn btn-green" 
+                @click="analyzeAnswerWithGemini('Internal_Q_3__c',opportunityDiscussed.Internal_Q_3__c,internalAnswer3)"
+                :disabled="!opportunityDiscussed"
+              >
+                Save Answer
+              </button>
+            </div>
+            <div v-if="isTranscribing && currentQuestionNumber === 3" class="transcribing-indicator">
+              Converting speech to text...
+            </div>
           </div>
         </div>
 
@@ -237,6 +294,14 @@ const promptForm = ref({
   name: '',
   template: ''
 });
+const audioPlayer = ref(null);
+const isGeneratingSpeech = ref(false);
+const isRecording = ref(false);
+const isTranscribing = ref(false);
+const mediaRecorder = ref(null);
+const audioChunks = ref([]);
+const currentQuestionNumber = ref(null);
+const audioStream = ref(null);
 
 // Computed property to extract the question from analysis
 const extractedQuestion = () => {
@@ -439,6 +504,169 @@ const deletePrompt = async (id) => {
       console.error('Error deleting prompt:', error);
       alert('Error deleting prompt. Please try again.');
     }
+  }
+};
+
+// Text-to-speech function
+const speakText = async (text) => {
+  if (!text || isGeneratingSpeech.value) return;
+  
+  try {
+    isGeneratingSpeech.value = true;
+    
+    const response = await axios.post(`${API_URL}text-to-speech`, {
+      text: text,
+      voice: 'coral',
+      instructions: 'Speak in a clear and engaging tone.'
+    });
+    
+    if (response.data.success && response.data.audioUrl) {
+      // Play the audio
+      audioPlayer.value.src = `${API_URL.replace(/\/$/, '')}${response.data.audioUrl}`;
+      audioPlayer.value.onloadedmetadata = () => {
+        audioPlayer.value.play();
+      };
+    } else {
+      console.error('Failed to generate speech');
+    }
+  } catch (error) {
+    console.error('Error generating speech:', error);
+    alert('Error generating speech. Please try again.');
+  } finally {
+    isGeneratingSpeech.value = false;
+  }
+};
+
+// Speech-to-text functions
+const startRecording = async () => {
+  try {
+    console.log('Starting recording for question', currentQuestionNumber.value);
+    
+    // Request audio-only permission
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: false
+    });
+    console.log('Got audio stream');
+    
+    // Store stream in separate variable
+    audioStream.value = stream;
+    
+    // Create simple MediaRecorder (browser will pick the appropriate MIME type)
+    mediaRecorder.value = new MediaRecorder(stream);
+    audioChunks.value = [];
+    
+    // Set up event handlers
+    mediaRecorder.value.ondataavailable = (event) => {
+      console.log('Data available from recorder, size:', event.data.size);
+      if (event.data.size > 0) {
+        audioChunks.value.push(event.data);
+      }
+    };
+    
+    mediaRecorder.value.onstop = async () => {
+      console.log('MediaRecorder stopped event triggered');
+      await transcribeAudio();
+    };
+    
+    // Start recording with 200ms interval for chunks
+    mediaRecorder.value.start(200);
+    console.log('MediaRecorder started');
+    isRecording.value = true;
+  } catch (error) {
+    console.error('Error starting recording:', error);
+    alert('Unable to access microphone. Please make sure your browser has permission to use the microphone.');
+    isRecording.value = false;
+    currentQuestionNumber.value = null;
+  }
+};
+
+const stopRecording = () => {
+  console.log('Stopping recording...');
+  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
+    mediaRecorder.value.stop();
+    console.log('MediaRecorder stopped');
+    
+    // Stop all tracks to release the microphone
+    if (audioStream.value) {
+      audioStream.value.getTracks().forEach(track => {
+        track.stop();
+        console.log('Track stopped');
+      });
+      audioStream.value = null;
+    }
+  }
+  isRecording.value = false;
+};
+
+const transcribeAudio = async () => {
+  if (audioChunks.value.length === 0) {
+    console.error('No audio chunks to transcribe');
+    return;
+  }
+  
+  try {
+    isTranscribing.value = true;
+    
+    // Create audio blob - let the browser determine the best format
+    const audioBlob = new Blob(audioChunks.value);
+    console.log('Created audio blob of size:', audioBlob.size, 'bytes');
+    
+    if (audioBlob.size < 100) {
+      console.error('Audio blob too small, likely no audio recorded');
+      alert('No audio was recorded. Please try again and speak clearly.');
+      isTranscribing.value = false;
+      return;
+    }
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.webm');
+    
+    console.log('Sending audio for transcription, size:', audioBlob.size);
+    
+    // Send to backend with timeout
+    const response = await axios.post(`${API_URL}speech-to-text`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      timeout: 60000 // 60 second timeout (speech processing can take time)
+    });
+    
+    console.log('Transcription response:', response.data);
+    
+    if (response.data.success && response.data.text) {
+      // Update the appropriate answer field based on which question was recorded
+      if (currentQuestionNumber.value === 1) {
+        internalAnswer.value = response.data.text;
+        console.log('Updated question 1 answer:', internalAnswer.value);
+      } else if (currentQuestionNumber.value === 2) {
+        internalAnswer2.value = response.data.text;
+        console.log('Updated question 2 answer:', internalAnswer2.value);
+      } else if (currentQuestionNumber.value === 3) {
+        internalAnswer3.value = response.data.text;
+        console.log('Updated question 3 answer:', internalAnswer3.value);
+      }
+    } else {
+      console.error('Failed to transcribe speech:', response.data);
+      alert('Failed to transcribe speech. Please try again.');
+    }
+  } catch (error) {
+    console.error('Error transcribing speech:', error);
+    alert(`Error transcribing speech: ${error.message}. Please try again.`);
+  } finally {
+    isTranscribing.value = false;
+    currentQuestionNumber.value = null;
+    audioChunks.value = [];
+  }
+};
+
+const toggleRecording = (questionNumber) => {
+  if (isRecording.value && currentQuestionNumber.value === questionNumber) {
+    stopRecording();
+  } else {
+    currentQuestionNumber.value = questionNumber;
+    startRecording();
   }
 };
 
@@ -712,5 +940,88 @@ onMounted(async () => {
     .close {
       cursor: pointer;
       font-size: 24px;
+    }
+    .question-with-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .btn-audio {
+      background-color: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      margin-left: 10px;
+      transition: background-color 0.3s;
+    }
+    
+    .btn-audio:hover {
+      background-color: #357ac1;
+    }
+    
+    .btn-audio:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .input-controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    
+    .btn-recording {
+      background-color: #9c27b0;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    .btn-recording:hover {
+      background-color: #7b1fa2;
+    }
+    
+    .btn-recording.recording {
+      background-color: #f44336;
+      animation: pulse 1.5s infinite;
+    }
+    
+    .btn-recording:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+      animation: none;
+    }
+    
+    .transcribing-indicator {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #666;
+      font-style: italic;
+    }
+    
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.1);
+      }
+      100% {
+        transform: scale(1);
+      }
     }
   </style>
