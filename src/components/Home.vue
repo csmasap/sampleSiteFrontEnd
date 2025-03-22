@@ -214,6 +214,47 @@
                 </div>
               </div>
             </div>
+
+            <!-- Fifth Question Section (Generated) -->
+            <div class="question-section" v-if="fiftQuestion || isGeneratingQuestion">
+              <h4>Fifth Question:</h4>
+              <div v-if="isGeneratingQuestion" class="generating-indicator">
+                <div class="spinner"></div>
+                <p>Generating follow-up question based on your answers...</p>
+              </div>
+              <p v-else>{{ fiftQuestion }}</p>
+              <div class="input-group" v-if="!isGeneratingQuestion">
+                <textarea 
+                  v-model="internalAnswer5" 
+                  placeholder="Share with us your best answer"
+                  class="expandable-textarea"
+                  rows="3"
+                  @input="autoGrow($event.target)"
+                ></textarea>
+                <div class="input-controls">
+                  <button 
+                    class="btn btn-recording" 
+                    @click="toggleRecording(5)"
+                    :disabled="isTranscribing || (isRecording && currentQuestionNumber !== 5)"
+                    :class="{ 'recording': isRecording && currentQuestionNumber === 5 }"
+                    title="Record your answer"
+                  >
+                    <span v-if="isRecording && currentQuestionNumber === 4">⏹️</span>
+                    <span v-else>🎤</span>
+                  </button>
+                  <button 
+                    class="btn btn-green" 
+                    @click="saveFourthAnswer"
+                  >
+                    Save Answer
+                  </button>
+                </div>
+                <div v-if="isTranscribing && currentQuestionNumber === 5" class="transcribing-indicator">
+                  Converting speech to text...
+                </div>
+              </div>
+            </div>
+
           </div>
           
           <!-- Analysis Tab -->
@@ -381,6 +422,9 @@ const internalAnswer4 = ref('');
 const fourthQuestion = ref('');
 const fourthQuestionAnalysis = ref('');
 const isGeneratingQuestion = ref(false);
+const fiftQuestion = ref('');
+const internalAnswer5 = ref('');
+
 
 // Computed property to extract the question from analysis
 const extractedQuestion = () => {
@@ -822,6 +866,29 @@ const saveFourthAnswer = async () => {
   } catch (error) {
     console.error('Error analyzing fourth answer:', error);
     alert('Error analyzing fourth answer. Please try again.');
+  }
+};
+
+const generateFifthQuestion  = async () => {
+  try {
+    // Process the fourth answer
+    const response = await axios.post(`${API_URL}generateFifthQuestion`, {
+      jobData: jobs.value[0],
+      question: fourthQuestion.value,
+      answer: internalAnswer4.value,
+      analysis1: analysisInternal_Q_1__c.value,
+      analysis2: analysisInternal_Q_2__c.value,
+      analysis3: analysisInternal_Q_3__c.value,
+      question1: internalAnswer.value, 
+      question2: internalAnswer2.value,
+      question3: internalAnswer3.value
+    });
+    
+    fiftQuestion.value = response.data.analysis;
+    alert('fifth question generated!');
+  } catch (error) {
+    console.error('Error generating fifth question:', error);
+    alert('Error generating fifth question. Please try again.');
   }
 };
 
