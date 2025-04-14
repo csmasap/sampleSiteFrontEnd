@@ -54,7 +54,7 @@
                 <p v-else>Loading question...</p>
                 <button 
                   class="btn btn-audio" 
-                  @click="speakText(opportunityDiscussed.Internal_Q_1__c)"
+                  @click="speakText(candidateName+', '+opportunityDiscussed.Internal_Q_1__c)"
                   :disabled="!opportunityDiscussed || isGeneratingSpeech"
                   title="Read question aloud"
                 >
@@ -97,8 +97,59 @@
               </div>
             </div>
 
+            <!-- <div class="question-section">
+              <h4>AI Question:</h4>
+              <div class="question-with-controls">
+                <p v-if="analysisInternal_Q_1__c">{{ analysisInternal_Q_1__c }}</p>
+                <p v-else>Loading question...</p>
+                <button 
+                  class="btn btn-audio" 
+                  @click="speakText(candidateName+', '+analysisInternal_Q_1__c)"
+                  :disabled="!opportunityDiscussed || isGeneratingSpeech"
+                  title="Read question aloud"
+                >
+                  <span v-if="isGeneratingSpeech">🔊 ...</span>
+                  <span v-else>🔊</span>
+                </button>
+              </div>
+              <audio ref="audioPlayer" style="display: none;"></audio>
+              <div class="input-group">
+                <textarea 
+                  v-model="aianswer1" 
+                  :placeholder="opportunityDiscussed ? 'Share with us your best answer' : 'Loading...'"
+                  :disabled="!opportunityDiscussed"
+                  class="expandable-textarea"
+                  rows="3"
+                  @input="autoGrow($event.target)"
+                ></textarea>
+                <div class="input-controls">
+                  <button 
+                    class="btn btn-recording" 
+                    @click="toggleRecording(0)"
+                    :disabled="!opportunityDiscussed || isTranscribing || (isRecording && currentQuestionNumber !== 1)"
+                    :class="{ 'recording': isRecording && currentQuestionNumber === 1 }"
+                    title="Record your answer"
+                  >
+                    <span v-if="isRecording && currentQuestionNumber === 1">⏹️</span>
+                    <span v-else>🎤</span>
+                  </button>
+                  <button 
+                    class="btn btn-green" 
+                    @click="analyzeAnswerWithGemini('OD_openai_answer_2__c',analysisInternal_Q_1__c,aianswer1)"
+                    :disabled="!opportunityDiscussed"
+                  >
+                    Save Answer
+                  </button>
+                </div>
+                <div v-if="isTranscribing && currentQuestionNumber === 1" class="transcribing-indicator">
+                  Converting speech to text...
+                </div>
+              </div>
+            </div> -->
+            
+
             <!-- Internal Question 2 Section -->
-            <div class="question-section">
+            <!-- <div class="question-section">
               <h4>Second Question:</h4>
               <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_2__c }}</p>
               <p v-else>Loading question...</p>
@@ -134,10 +185,10 @@
                   Converting speech to text...
                 </div>
               </div>
-            </div>
+            </div> -->
 
             <!-- Internal Question 3 Section -->
-            <div class="question-section">
+            <!-- <div class="question-section">
               <h4>Third Question:</h4>
               <p v-if="opportunityDiscussed">{{ opportunityDiscussed.Internal_Q_3__c }}</p>
               <p v-else>Loading question...</p>
@@ -173,7 +224,7 @@
                   Converting speech to text...
                 </div>
               </div>
-            </div>
+            </div> -->
 
             <!-- Fourth Question Section (Generated) -->
             <div class="question-section" v-if="fourthQuestion || isGeneratingQuestion">
@@ -378,6 +429,69 @@
         <button class="btn btn-green" @click="savePrompt">Save Prompt</button>
       </div>
     </div>
+
+
+    <div class="modal recording-modal" :style="{ display: showRecordingModal ? 'block' : 'none' }">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 v-if="recordingModalQuestionNumber">Recording Answer for Question {{ recordingModalQuestionNumber }}</h3>
+           <h3 v-else>Recording Answer</h3>
+          <span class="close" @click="cancelRecordingModal">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div v-if="micAccessStatus === 'requesting'" class="status-message">
+             <div class="spinner-small"></div> Requesting microphone access... Please allow access in your browser.
+          </div>
+          <div v-if="micAccessStatus === 'denied'" class="status-message error">
+            Microphone access denied. Please check your browser's site settings and allow microphone access for this page.
+          </div>
+           <div v-if="micAccessStatus === 'error'" class="status-message error">
+            Error accessing microphone: {{ modalErrorMessage }}
+          </div>
+
+          <div v-if="micAccessStatus === 'granted'">
+            <div class="recording-indicator" :class="{ 'is-recording': isModalRecording }">
+              <div class="mic-icon">🎤</div>
+              <div class="pulsing-circle circle-1"></div>
+              <div class="pulsing-circle circle-2"></div>
+              <div class="pulsing-circle circle-3"></div>
+            </div>
+            <p v-if="isModalRecording" class="status-message">Recording...</p>
+             <div v-else-if="isTranscribing" class="status-message">
+               <div class="spinner-small"></div> Processing audio...
+             </div>
+            <p v-else class="status-message">Ready to record.</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+           <button
+             v-if="micAccessStatus === 'granted' && !isModalRecording && !isTranscribing"
+             class="btn btn-green"
+             @click="startRecordingInModal"
+             :disabled="isTranscribing"
+           >
+             Start Recording
+           </button>
+          <button
+             v-if="micAccessStatus === 'granted' && isModalRecording"
+             class="btn btn-orange"
+             @click="stopRecordingFromModal"
+             :disabled="isTranscribing"
+           >
+             Stop Recording
+           </button>
+          <button
+            class="btn btn-gray"
+            @click="cancelRecordingModal"
+            :disabled="isTranscribing"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+    
+
   </div>
 
   </template>
@@ -424,6 +538,13 @@ const fourthQuestionAnalysis = ref('');
 const isGeneratingQuestion = ref(false);
 const fiftQuestion = ref('');
 const internalAnswer5 = ref('');
+const showRecordingModal = ref(false);
+const recordingModalQuestionNumber = ref(null); // To know which question the modal is for
+const micAccessStatus = ref('idle'); // 'idle', 'requesting', 'granted', 'denied', 'error'
+const isModalRecording = ref(false); // Separate state for modal's visual recording status
+const modalErrorMessage = ref('');
+const candidateName = ref('');
+const aianswer1 = ref('');
 
 
 // Computed property to extract the question from analysis
@@ -464,6 +585,7 @@ const getOpportunityDiscussed = async () => {
     opportunityDiscussed.value = response.data.records[0] || null;
     if (opportunityDiscussed.value) {
       internalAnswer.value = opportunityDiscussed.value.Internal_Answer_1__c || '';
+      candidateName.value = response.data.records[0].TR1__Candidate__r.Name|| '';
     }
   } catch (error) {
     console.error('Error fetching opportunity discussed:', error);
@@ -704,95 +826,326 @@ const startRecording = async () => {
   }
 };
 
-const stopRecording = () => {
-  console.log('Stopping recording...');
-  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
-    mediaRecorder.value.stop();
-    console.log('MediaRecorder stopped');
+// const stopRecording = () => {
+//   console.log('Stopping recording...');
+//   if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
+//     mediaRecorder.value.stop();
+//     console.log('MediaRecorder stopped');
     
-    // Stop all tracks to release the microphone
-    if (audioStream.value) {
-      audioStream.value.getTracks().forEach(track => {
-        track.stop();
-        console.log('Track stopped');
-      });
-      audioStream.value = null;
-    }
-  }
-  isRecording.value = false;
-};
+//     // Stop all tracks to release the microphone
+//     if (audioStream.value) {
+//       audioStream.value.getTracks().forEach(track => {
+//         track.stop();
+//         console.log('Track stopped');
+//       });
+//       audioStream.value = null;
+//     }
+//   }
+//   isRecording.value = false;
+// };
 
-const transcribeAudio = async () => {
-  if (audioChunks.value.length === 0) {
-    console.error('No audio chunks to transcribe');
-    return;
+// const transcribeAudio = async () => {
+//   if (audioChunks.value.length === 0) {
+//     console.error('No audio chunks to transcribe');
+//     return;
+//   }
+  
+//   try {
+//     isTranscribing.value = true;
+    
+//     // Create audio blob - let the browser determine the best format
+//     const audioBlob = new Blob(audioChunks.value);
+//     console.log('Created audio blob of size:', audioBlob.size, 'bytes');
+    
+//     if (audioBlob.size < 100) {
+//       console.error('Audio blob too small, likely no audio recorded');
+//       alert('No audio was recorded. Please try again and speak clearly.');
+//       isTranscribing.value = false;
+//       return;
+//     }
+    
+//     // Create form data
+//     const formData = new FormData();
+//     formData.append('audio', audioBlob, 'recording.webm');
+    
+//     console.log('Sending audio for transcription, size:', audioBlob.size);
+    
+//     // Send to backend with timeout
+//     const response = await axios.post(`${API_URL}speech-to-text`, formData, {
+//       headers: {
+//         'Content-Type': 'multipart/form-data'
+//       },
+//       timeout: 60000 // 60 second timeout (speech processing can take time)
+//     });
+    
+//     console.log('Transcription response:', response.data);
+    
+//     if (response.data.success && response.data.text) {
+//       // Update the appropriate answer field based on which question was recorded
+//       if (currentQuestionNumber.value === 1) {
+//         internalAnswer.value = response.data.text;
+//         console.log('Updated question 1 answer:', internalAnswer.value);
+//       } else if (currentQuestionNumber.value === 2) {
+//         internalAnswer2.value = response.data.text;
+//         console.log('Updated question 2 answer:', internalAnswer2.value);
+//       } else if (currentQuestionNumber.value === 3) {
+//         internalAnswer3.value = response.data.text;
+//         console.log('Updated question 3 answer:', internalAnswer3.value);
+//       } else if (currentQuestionNumber.value === 4) {
+//         internalAnswer4.value = response.data.text;
+//         console.log('Updated question 4 answer:', internalAnswer4.value);
+//       }
+//     } else {
+//       console.error('Failed to transcribe speech:', response.data);
+//       alert('Failed to transcribe speech. Please try again.');
+//     }
+//   } catch (error) {
+//     console.error('Error transcribing speech:', error);
+//     alert(`Error transcribing speech: ${error.message}. Please try again.`);
+//   } finally {
+//     isTranscribing.value = false;
+//     currentQuestionNumber.value = null;
+//     audioChunks.value = [];
+//   }
+// };
+
+// const toggleRecording = (questionNumber) => {
+//   if (isRecording.value && currentQuestionNumber.value === questionNumber) {
+//     stopRecording();
+//   } else {
+//     currentQuestionNumber.value = questionNumber;
+//     startRecording();
+//   }
+// };
+
+const toggleRecording = (questionNumber) => {
+  // This function now just opens the modal
+  openRecordingModal(questionNumber);
+  if(questionNumber == 0){
+    speakText(candidateName.value+', '+analysisInternal_Q_1__c.value);
+  }else{
+    speakText(candidateName.value+', '+opportunityDiscussed.value.Internal_Q_1__c);
   }
   
+};
+
+
+const openRecordingModal = async (questionNumber) => {
+  console.log('Opening recording modal for question:', questionNumber);
+  recordingModalQuestionNumber.value = questionNumber;
+  currentQuestionNumber.value = questionNumber; // Keep track of the target question
+  micAccessStatus.value = 'requesting';
+  isModalRecording.value = false;
+  modalErrorMessage.value = '';
+  audioChunks.value = []; // Clear previous chunks
+  showRecordingModal.value = true;
+
+  // Try to get microphone access immediately
   try {
-    isTranscribing.value = true;
-    
-    // Create audio blob - let the browser determine the best format
-    const audioBlob = new Blob(audioChunks.value);
-    console.log('Created audio blob of size:', audioBlob.size, 'bytes');
-    
-    if (audioBlob.size < 100) {
-      console.error('Audio blob too small, likely no audio recorded');
-      alert('No audio was recorded. Please try again and speak clearly.');
-      isTranscribing.value = false;
-      return;
-    }
-    
-    // Create form data
-    const formData = new FormData();
-    formData.append('audio', audioBlob, 'recording.webm');
-    
-    console.log('Sending audio for transcription, size:', audioBlob.size);
-    
-    // Send to backend with timeout
-    const response = await axios.post(`${API_URL}speech-to-text`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      timeout: 60000 // 60 second timeout (speech processing can take time)
+    console.log('Requesting microphone access...');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: false
     });
-    
-    console.log('Transcription response:', response.data);
-    
-    if (response.data.success && response.data.text) {
-      // Update the appropriate answer field based on which question was recorded
-      if (currentQuestionNumber.value === 1) {
-        internalAnswer.value = response.data.text;
-        console.log('Updated question 1 answer:', internalAnswer.value);
-      } else if (currentQuestionNumber.value === 2) {
-        internalAnswer2.value = response.data.text;
-        console.log('Updated question 2 answer:', internalAnswer2.value);
-      } else if (currentQuestionNumber.value === 3) {
-        internalAnswer3.value = response.data.text;
-        console.log('Updated question 3 answer:', internalAnswer3.value);
-      } else if (currentQuestionNumber.value === 4) {
-        internalAnswer4.value = response.data.text;
-        console.log('Updated question 4 answer:', internalAnswer4.value);
+    console.log('Microphone access granted.');
+    audioStream.value = stream; // Store the stream
+    micAccessStatus.value = 'granted';
+    // Don't start recording automatically, wait for button click
+  } catch (error) {
+    console.error('Error getting microphone access:', error);
+    micAccessStatus.value = 'denied';
+     if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        modalErrorMessage.value = "Permission denied. Please allow microphone access in browser settings.";
+        micAccessStatus.value = 'denied';
+     } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+         modalErrorMessage.value = "No microphone found. Please ensure a microphone is connected and enabled.";
+         micAccessStatus.value = 'error';
+     } else {
+         modalErrorMessage.value = `An unexpected error occurred: ${error.name}`;
+          micAccessStatus.value = 'error';
+     }
+     // Don't close the modal, show the error message
+  }
+};
+
+const startRecordingInModal = () => {
+  if (micAccessStatus.value !== 'granted' || !audioStream.value) {
+    console.error('Cannot start recording: Mic access not granted or stream not available.');
+    modalErrorMessage.value = "Microphone access issue. Please try cancelling and reopening the recording window.";
+    micAccessStatus.value = 'error';
+    return;
+  }
+
+  try {
+    console.log('Starting recording from modal for question', currentQuestionNumber.value);
+
+    // Create MediaRecorder using the existing stream
+    mediaRecorder.value = new MediaRecorder(audioStream.value);
+    audioChunks.value = []; // Reset chunks just in case
+
+    mediaRecorder.value.ondataavailable = (event) => {
+      console.log('Data available from recorder, size:', event.data.size);
+      if (event.data.size > 0) {
+        audioChunks.value.push(event.data);
       }
+    };
+
+    mediaRecorder.value.onstop = async () => {
+      console.log('MediaRecorder stopped event triggered (from modal)');
+      isModalRecording.value = false; // Update modal visual state
+      // Transcription will handle closing the modal
+      await transcribeAudio();
+    };
+
+     mediaRecorder.value.onerror = (event) => {
+       console.error('MediaRecorder error:', event.error);
+       modalErrorMessage.value = `Recording error: ${event.error.name}. Please try again.`;
+       micAccessStatus.value = 'error'; // Indicate an error state in the modal
+       isModalRecording.value = false;
+       isRecording.value = false; // Also update main state
+       // Optionally stop tracks here if needed
+       if (audioStream.value) {
+         audioStream.value.getTracks().forEach(track => track.stop());
+         audioStream.value = null;
+       }
+    };
+
+    mediaRecorder.value.start(200); // Start recording with chunks
+    console.log('MediaRecorder started');
+    isModalRecording.value = true; // Update modal visual state
+    isRecording.value = true; // Update the main recording state
+  } catch (error) {
+    console.error('Error starting MediaRecorder:', error);
+     modalErrorMessage.value = `Failed to start recording: ${error.message}.`;
+     micAccessStatus.value = 'error';
+     isModalRecording.value = false;
+     isRecording.value = false;
+  }
+};
+
+
+const stopRecording = () => {
+  console.log('Stopping recording logic...');
+  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
+     try {
+        mediaRecorder.value.stop(); // This triggers the onstop event
+        console.log('MediaRecorder stop() called.');
+     } catch (error) {
+       console.error("Error stopping MediaRecorder:", error);
+       // Handle cases where stopping fails, maybe force close?
+       isModalRecording.value = false; // Still update UI
+       isRecording.value = false;
+     }
+  } else {
+     console.log('MediaRecorder not active or not initialized.');
+     isModalRecording.value = false; // Ensure UI state is correct
+     isRecording.value = false;
+  }
+
+  // Stop tracks *after* recorder is stopped or if it wasn't running
+  if (audioStream.value) {
+    audioStream.value.getTracks().forEach(track => {
+      track.stop();
+      console.log('Audio track stopped');
+    });
+    audioStream.value = null; // Release the stream reference
+  }
+
+  // Note: isRecording/isModalRecording are set false here and/or in onstop
+  // Let the onstop handler deal with transcription
+  isRecording.value = false; // Set main state immediately
+};
+
+const stopRecordingFromModal = () => {
+    stopRecording(); // Call the core stop logic
+    // The onstop handler will manage transcription and modal closing
+};
+
+
+const cancelRecordingModal = () => {
+  console.log('Cancelling recording modal.');
+  if (isModalRecording.value) {
+    stopRecording(); // Stop recording if it's active
+  } else if (audioStream.value) {
+     // If not recording but stream exists, stop tracks
+     audioStream.value.getTracks().forEach(track => track.stop());
+     audioStream.value = null;
+  }
+
+  // Reset states
+  showRecordingModal.value = false;
+  isModalRecording.value = false;
+  isRecording.value = false; // Ensure main state is reset too
+  isTranscribing.value = false; // Cancel transcription if it was somehow pending
+  micAccessStatus.value = 'idle';
+  recordingModalQuestionNumber.value = null;
+  currentQuestionNumber.value = null; // Clear the target question
+  audioChunks.value = [];
+  mediaRecorder.value = null;
+};
+
+
+const transcribeAudio = async () => {
+  // ... (keep existing initial checks for audioChunks.length)
+   if (audioChunks.value.length === 0) {
+    console.error('No audio chunks to transcribe');
+    alert('No audio was recorded. Please try again.');
+    // Ensure modal closes even if no chunks
+    cancelRecordingModal(); // Use cancel to reset everything
+    return;
+  }
+
+  try {
+    isTranscribing.value = true; // Keep main transcribing indicator
+    console.log('Modal: Transcription started.'); // Log modal context
+    // ... (keep existing blob creation and size check)
+     const audioBlob = new Blob(audioChunks.value); // Browser decides type
+     console.log('Created audio blob of size:', audioBlob.size, 'bytes');
+
+     if (audioBlob.size < 100) {
+       console.error('Audio blob too small, likely no audio recorded');
+       alert('No audio was recorded. Please try again and speak clearly.');
+       isTranscribing.value = false;
+       cancelRecordingModal(); // Reset and close modal
+       return;
+     }
+
+    // ... (keep existing FormData creation and axios call)
+     const formData = new FormData();
+     // Try common extensions, 'audio/webm' is often default
+     formData.append('audio', audioBlob, `recording-${Date.now()}.webm`);
+     console.log('Sending audio for transcription, size:', audioBlob.size);
+
+     const response = await axios.post(`${API_URL}speech-to-text`, formData, {
+       headers: {
+         'Content-Type': 'multipart/form-data'
+       },
+       timeout: 60000 // 60 second timeout
+     });
+
+    // ... (keep existing success/failure logic for updating textareas)
+    console.log('Transcription response:', response.data);
+
+    if (response.data.success && response.data.text) {
+      const questionNum = currentQuestionNumber.value; // Use the stored question number
+      if (questionNum === 1) internalAnswer.value = response.data.text;
+      else if (questionNum === 2) internalAnswer2.value = response.data.text;
+      else if (questionNum === 3) internalAnswer3.value = response.data.text;
+      else if (questionNum === 4) internalAnswer4.value = response.data.text;
+      else if (questionNum === 5) internalAnswer5.value = response.data.text; // Added Q5
+      console.log(`Updated question ${questionNum} answer:`, response.data.text);
     } else {
       console.error('Failed to transcribe speech:', response.data);
       alert('Failed to transcribe speech. Please try again.');
     }
+
   } catch (error) {
     console.error('Error transcribing speech:', error);
     alert(`Error transcribing speech: ${error.message}. Please try again.`);
   } finally {
     isTranscribing.value = false;
-    currentQuestionNumber.value = null;
-    audioChunks.value = [];
-  }
-};
-
-const toggleRecording = (questionNumber) => {
-  if (isRecording.value && currentQuestionNumber.value === questionNumber) {
-    stopRecording();
-  } else {
-    currentQuestionNumber.value = questionNumber;
-    startRecording();
+    // Reset and close the modal regardless of success/failure
+    cancelRecordingModal(); // Use cancel function to ensure cleanup
   }
 };
 
@@ -1357,4 +1710,181 @@ onMounted(async () => {
         transform: rotate(360deg);
       }
     }
+
+
+    /* Basic Modal Styling (Adapt as needed) */
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed; /* Stay in place */
+  z-index: 1000; /* Sit on top */
+  left: 0;
+  top: 0;
+  width: 100%; /* Full width */
+  height: 100%; /* Full height */
+  overflow: auto; /* Enable scroll if needed */
+  background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+}
+
+.modal-content {
+  background-color: #fefefe;
+  /* margin: 15% auto;  */
+  padding: 0; /* Remove padding, header/body/footer will have it */
+  border: 1px solid #888;
+  width: 80%; /* Could be more or less, depending on screen size */
+  max-width: 500px; /* Maximum width */
+  border-radius: 8px;
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 15px 20px;
+  background-color: #f1f1f1; /* Light grey header */
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+   border-top-left-radius: 8px;
+   border-top-right-radius: 8px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.2em;
+  color: #333;
+}
+
+.close {
+  color: #aaa;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+}
+
+.modal-body {
+  padding: 20px;
+  min-height: 150px; /* Ensure minimum space */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.modal-footer {
+  padding: 15px 20px;
+  background-color: #f1f1f1; /* Light grey footer */
+  border-top: 1px solid #ddd;
+  text-align: right;
+   border-bottom-left-radius: 8px;
+   border-bottom-right-radius: 8px;
+}
+
+.modal-footer .btn {
+  margin-left: 10px;
+}
+
+/* Recording Indicator Styles */
+.recording-indicator {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px; /* Space below indicator */
+}
+
+.mic-icon {
+  font-size: 30px;
+  z-index: 5; /* Keep mic icon on top */
+}
+
+.pulsing-circle {
+  position: absolute;
+  border: 2px solid #4CAF50; /* Green color */
+  border-radius: 50%;
+  opacity: 0; /* Start hidden */
+  transform: scale(0.8);
+  z-index: 1; /* Behind mic icon */
+}
+
+/* Animation for pulsing circles */
+@keyframes pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  50% {
+     opacity: 0.1;
+  }
+  100% {
+    transform: scale(1.8); /* Grow larger */
+    opacity: 0;
+  }
+}
+
+/* Apply animation when recording */
+.recording-indicator.is-recording .pulsing-circle {
+  animation: pulse 2s infinite ease-out;
+}
+
+.recording-indicator.is-recording .circle-1 {
+  width: 100%;
+  height: 100%;
+}
+
+.recording-indicator.is-recording .circle-2 {
+  width: 100%;
+  height: 100%;
+  animation-delay: 0.5s; /* Stagger the animations */
+}
+
+.recording-indicator.is-recording .circle-3 {
+  width: 100%;
+  height: 100%;
+  animation-delay: 1s; /* Stagger the animations */
+}
+
+.status-message {
+  margin-top: 10px;
+  color: #555;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.status-message.error {
+  color: #d9534f; /* Red for errors */
+  font-weight: bold;
+  font-style: normal;
+}
+
+/* Small spinner for requesting/processing */
+.spinner-small {
+  border: 3px solid #f3f3f3; /* Light grey */
+  border-top: 3px solid #3498db; /* Blue */
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Ensure modal buttons are spaced */
+.modal-footer .btn + .btn {
+    margin-left: 10px;
+}
 </style>
